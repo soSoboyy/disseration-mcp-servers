@@ -1,7 +1,7 @@
 ## MCP Server (recon-server)
 
 As a proof-of-concept, I am going to be building a simple MCP server that performs *active external reconnaissance* against a *domain name*, using tools such as *dig*, *whois*, *reverse-dns-lookup*, *attempt zone transfer*, *enumerate-dns-record* and also analyses *HTTP headers*.
-External reconnaissance is a vital phase in red teaming and penetration testing to collect internet-accessible information against a target that can be leveraged for initial access. (*Academic Reference here, please*)
+External reconnaissance is a vital phase in red teaming and penetration testing to collect internet-accessible information against a target that can be leveraged for initial access.
 
 Anthropic provides SDKs for different programming language to build the servers, which provide the same functionality but follows the idioms and best practices of their language. Our choice is [Python](https://github.com/modelcontextprotocol/python-sdk) for its simplicity.
 
