@@ -147,17 +147,6 @@ async def attempt_zone_transfer(domainname: str) -> str:
 - **Why dangerous**: If successful, reveals ALL subdomains and records
 - **Reality**: Usually fails due to security restrictions
 
-### Subdomain Enumeration:
-```python
-async def enumerate_subdomains(domainname: str) -> str:
-```
-
-**Purpose**: Discover subdomains using standard techniques
-
-- **Tool**: Uses `dnsrecon` (specialized DNS reconnaissance tool)
-- **Command**: `dnsrecon -d {domainname} -t std`
-- **Method**: Tries common subdomain names and DNS walking techniques
-
 ### DNS Records Enumeration:
 ```python
 async def enumerate_dns_records(domainname: str) -> str:
