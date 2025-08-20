@@ -35,7 +35,8 @@ Anthropic provides SDKs for different programming language to build the servers,
 | Create virtual environment                                                                                            | `uv venv`                       |                                                        |
 | Activate virtual environment only for this directory                                                                  | `source .venv/bin/activate`     |                                                        |
 | Add MCP to the project dependencies:                                                                                  | `uv add "mcp[cli]"`             |                                                        |
-| Running MCP development tools to check it's working                                                                   | `uv run mcp`                    | ![[attachments/Screenshot 2025-08-15 at 17.55.55.png]] |
+| Running MCP development tools to check it's working                                                                   | `uv run mcp`                    | <img width="517" height="254" alt="Screenshot 2025-08-15 at 17 55 55" src="https://github.com/user-attachments/assets/337f1045-da2d-4f55-a853-b065d487dda5" />
+[[attachments/Screenshot 2025-08-15 at 17.55.55.png]] |
 | Create our server file                                                                                                | `touch recon-server.py`         |                                                        |
 
 #### Libraries:
