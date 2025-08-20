@@ -8,13 +8,13 @@ Anthropic provides SDKs for different programming language to build the servers,
 ### How MCP is run :
 - An **MCP server** is just a program that uses the MCP protocol (JSON-RPC over stdio).
 - When I tell Claude and VS Code how to use the server, it looks up how to run it, defined in the configuration file:
-![[attachments/Screenshot 2025-08-20 at 13.27.33.png]]
+![[main/Screenshot 2025-08-20 at 13.27.33.png]]
 **Claude doesn’t directly run the server** —> instead, it calls `uv run`
 
 
 ## Implementation diagram:
 
-![[attachments/recon-server-Page-2.drawio.png]]
+![[main/recon-server-Page-2.drawio.png]]
 
 ## Libraries and Implementation:
 
