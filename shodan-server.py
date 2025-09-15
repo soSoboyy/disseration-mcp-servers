@@ -18,7 +18,7 @@ def get_shodan_client():
         raise ValueError("SHODAN_API_KEY environment variable not set")
     return shodan.Shodan(SHODAN_API_KEY)
 
-#  SEARCH TOOLS
+#  Shodan intelligence search
 @mcp.tool()
 async def shodan_host_intelligence(ip_address: str):
     """
@@ -62,7 +62,7 @@ async def shodan_host_intelligence(ip_address: str):
                 "total_vulns": len(host_data.get("vulns", [])),
             },
             "services": [],
-            "timestamp": datetime.now().isoformat()  # Now works correctly
+            "timestamp": datetime.now().isoformat() 
         }
         
         # Process service data
@@ -573,7 +573,7 @@ Analyze the results for:
 Remember to check your API credits before running large searches!
 """
 
-# Main func
+# Main function
 if __name__ == "__main__":
     if not SHODAN_API_KEY:
         print(" Error: SHODAN_API_KEY environment variable not set", file=sys.stderr)
