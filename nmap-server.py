@@ -1,4 +1,4 @@
-# Nmap Server - Fixed Version
+# Nmap Server - This requires root privileges
 
 import json
 import sys
@@ -14,7 +14,7 @@ from mcp.server.fastmcp import FastMCP
 # Initialize FastMCP server
 mcp = FastMCP("nmap-server")
 
-# Config
+
 def validate_target(target: str) -> bool:
     """Validate target format for security."""
     # IP address pattern
@@ -30,13 +30,39 @@ def validate_target(target: str) -> bool:
         re.match(hostname_pattern, target)
     )
 
-async def execute_nmap(target: str, options: List[str], scan_type: str) -> Dict[str, Any]:
-    """Execute Nmap scan with comprehensive error handling."""
+async def execute_nmap(target: str, options: List[str], scan_type: str, use_sudo: bool = False) -> Dict[str, Any]:
+    """Execute Nmap scan with comprehensive error handling and optional sudo."""
     if not validate_target(target):
         return {"error": "Invalid target format. Use IP address, hostname, or CIDR notation."}
 
     # Construct command with XML output for better parsing
-    cmd = ["nmap", "-oX", "-"] + options + [target]
+    base_cmd = ["nmap", "-oX", "-"] + options + [target]
+    
+    # Add sudo if needed
+    if use_sudo:
+        # Check if we can use sudo
+        if os.geteuid() != 0:  # Not running as root
+            # Try to check if sudo is available and configured
+            try:
+                sudo_check = subprocess.run(
+                    ["sudo", "-n", "nmap", "--version"], 
+                    capture_output=True, 
+                    timeout=5
+                )
+                if sudo_check.returncode != 0:
+                    return {
+                        "error": "Sudo privileges required but not available. Configure sudoers or run as root.",
+                        "suggestion": "Run: sudo visudo and add: 'your_username ALL=(ALL) NOPASSWD: /usr/bin/nmap'"
+                    }
+            except (subprocess.TimeoutExpired, FileNotFoundError):
+                return {
+                    "error": "Cannot verify sudo access. Ensure sudo is installed and configured.",
+                    "suggestion": "Try running the application with: sudo python nmap_server.py"
+                }
+        
+        cmd = ["sudo"] + base_cmd
+    else:
+        cmd = base_cmd
     
     try:
         process = await asyncio.create_subprocess_exec(
@@ -182,6 +208,7 @@ def parse_nmap_xml(xml_output: str) -> Dict[str, Any]:
     except ET.ParseError as e:
         raise Exception(f"XML parsing error: {e}")
 
+# Verbose summary of the scan
 def generate_scan_summary(parsed_data: Dict[str, Any]) -> Dict[str, Any]:
     """Generate a summary of scan results."""
     summary = {
@@ -209,7 +236,9 @@ def generate_scan_summary(parsed_data: Dict[str, Any]) -> Dict[str, Any]:
     
     return summary
 
-#  DISCOVERY TOOLS 
+
+# Discovery tool
+
 @mcp.tool()
 async def nmap_ping_sweep(target_network: str, timeout: int = 5):
     """
@@ -221,10 +250,12 @@ async def nmap_ping_sweep(target_network: str, timeout: int = 5):
     """
     try:
         options = ["-sn", "--host-timeout", f"{timeout}s"]
-        result = await execute_nmap(target_network, options, "Ping Sweep")
+        result = await execute_nmap(target_network, options, "Ping Sweep", use_sudo=False)
         return json.dumps(result, indent=2)
     except Exception as e:
         return json.dumps({"error": f"Ping sweep failed: {str(e)}"})
+
+# TCP port scan tool
 
 @mcp.tool()
 async def nmap_tcp_scan(target: str, ports: str = "1-1000", scan_type: str = "connect"):
@@ -240,14 +271,18 @@ async def nmap_tcp_scan(target: str, ports: str = "1-1000", scan_type: str = "co
         if scan_type == "syn":
             options = ["-sS", "-p", ports]
             scan_name = "TCP SYN Scan"
+            use_sudo = True
         else:
             options = ["-sT", "-p", ports]
             scan_name = "TCP Connect Scan"
+            use_sudo = False
             
-        result = await execute_nmap(target, options, scan_name)
+        result = await execute_nmap(target, options, scan_name, use_sudo)
         return json.dumps(result, indent=2)
     except Exception as e:
         return json.dumps({"error": f"TCP scan failed: {str(e)}"})
+
+# UDP service scan tool
 
 @mcp.tool()
 async def nmap_udp_scan(target: str, ports: str = "53,67,68,69,123,161,162"):
@@ -260,12 +295,13 @@ async def nmap_udp_scan(target: str, ports: str = "53,67,68,69,123,161,162"):
     """
     try:
         options = ["-sU", "-p", ports]
-        result = await execute_nmap(target, options, "UDP Scan")
+        result = await execute_nmap(target, options, "UDP Scan", use_sudo=True)
         return json.dumps(result, indent=2)
     except Exception as e:
         return json.dumps({"error": f"UDP scan failed: {str(e)}"})
 
-# SERVICE DETECTION TOOLS
+# Service detection tool
+
 @mcp.tool()
 async def nmap_service_scan(target: str, ports: str = "1-1000"):
     """
@@ -277,7 +313,7 @@ async def nmap_service_scan(target: str, ports: str = "1-1000"):
     """
     try:
         options = ["-sV", "-p", ports]
-        result = await execute_nmap(target, options, "Service Version Detection")
+        result = await execute_nmap(target, options, "Service Version Detection", use_sudo=False)
         return json.dumps(result, indent=2)
     except Exception as e:
         return json.dumps({"error": f"Service scan failed: {str(e)}"})
@@ -292,7 +328,7 @@ async def nmap_os_detection(target: str):
     """
     try:
         options = ["-O"]
-        result = await execute_nmap(target, options, "OS Detection")
+        result = await execute_nmap(target, options, "OS Detection", use_sudo=True)
         return json.dumps(result, indent=2)
     except Exception as e:
         return json.dumps({"error": f"OS detection failed: {str(e)}"})
@@ -308,12 +344,12 @@ async def nmap_aggressive_scan(target: str, ports: str = "1-1000"):
     """
     try:
         options = ["-A", "-p", ports]
-        result = await execute_nmap(target, options, "Aggressive Scan")
+        result = await execute_nmap(target, options, "Aggressive Scan", use_sudo=True)
         return json.dumps(result, indent=2)
     except Exception as e:
         return json.dumps({"error": f"Aggressive scan failed: {str(e)}"})
 
-# SCRIPT SCANNING TOOLS 
+# Script scanning tool 
 @mcp.tool()
 async def nmap_vuln_scan(target: str, ports: str = "1-1000"):
     """
@@ -325,7 +361,7 @@ async def nmap_vuln_scan(target: str, ports: str = "1-1000"):
     """
     try:
         options = ["--script", "vuln", "-p", ports]
-        result = await execute_nmap(target, options, "Vulnerability Scan")
+        result = await execute_nmap(target, options, "Vulnerability Scan", use_sudo=False)
         return json.dumps(result, indent=2)
     except Exception as e:
         return json.dumps({"error": f"Vulnerability scan failed: {str(e)}"})
@@ -342,7 +378,7 @@ async def nmap_script_scan(target: str, script_name: str, ports: str = "1-1000")
     """
     try:
         options = ["--script", script_name, "-p", ports]
-        result = await execute_nmap(target, options, f"NSE Script: {script_name}")
+        result = await execute_nmap(target, options, f"NSE Script: {script_name}", use_sudo=False)
         return json.dumps(result, indent=2)
     except Exception as e:
         return json.dumps({"error": f"Script scan failed: {str(e)}"})
@@ -358,12 +394,12 @@ async def nmap_default_scripts(target: str, ports: str = "1-1000"):
     """
     try:
         options = ["-sC", "-p", ports]
-        result = await execute_nmap(target, options, "Default Scripts Scan")
+        result = await execute_nmap(target, options, "Default Scripts Scan", use_sudo=False)
         return json.dumps(result, indent=2)
     except Exception as e:
         return json.dumps({"error": f"Default scripts scan failed: {str(e)}"})
 
-#  STEALTH AND EVASION TOOLS 
+#  Stealth scan tool 
 @mcp.tool()
 async def nmap_stealth_scan(target: str, ports: str = "1-1000"):
     """
@@ -375,7 +411,7 @@ async def nmap_stealth_scan(target: str, ports: str = "1-1000"):
     """
     try:
         options = ["-sS", "-T2", "-f", "--source-port", "53", "-p", ports]
-        result = await execute_nmap(target, options, "Stealth Scan")
+        result = await execute_nmap(target, options, "Stealth Scan", use_sudo=True)
         return json.dumps(result, indent=2)
     except Exception as e:
         return json.dumps({"error": f"Stealth scan failed: {str(e)}"})
@@ -395,7 +431,7 @@ async def nmap_timing_scan(target: str, timing: str = "T3", ports: str = "1-1000
             return json.dumps({"error": "Invalid timing. Use T0-T5 (e.g., T3)"})
         
         options = ["-sS", f"-{timing}", "-p", ports]
-        result = await execute_nmap(target, options, f"Timing {timing} Scan")
+        result = await execute_nmap(target, options, f"Timing {timing} Scan", use_sudo=True)
         return json.dumps(result, indent=2)
     except Exception as e:
         return json.dumps({"error": f"Timing scan failed: {str(e)}"})
@@ -411,12 +447,12 @@ async def nmap_top_ports(target: str, top_ports: int = 1000):
     """
     try:
         options = ["-sS", "--top-ports", str(top_ports)]
-        result = await execute_nmap(target, options, f"Top {top_ports} Ports Scan")
+        result = await execute_nmap(target, options, f"Top {top_ports} Ports Scan", use_sudo=True)
         return json.dumps(result, indent=2)
     except Exception as e:
         return json.dumps({"error": f"Top ports scan failed: {str(e)}"})
 
-# CUSTOM SCAN TOOL
+# Custom scan
 @mcp.tool()
 async def nmap_custom_scan(target: str, options: str):
     """
@@ -428,12 +464,15 @@ async def nmap_custom_scan(target: str, options: str):
     """
     try:
         option_list = options.split()
-        result = await execute_nmap(target, option_list, "Custom Nmap Command")
+        # Determine if sudo is needed based on scan type
+        use_sudo = any(opt in option_list for opt in ["-sS", "-sU", "-O", "-A"])
+        
+        result = await execute_nmap(target, option_list, "Custom Nmap Command", use_sudo)
         return json.dumps(result, indent=2)
     except Exception as e:
         return json.dumps({"error": f"Custom scan failed: {str(e)}"})
 
-# Prompt
+# System prompt
 @mcp.prompt()
 def nmap_analysis_prompt(target: str = "") -> str:
     """
@@ -452,12 +491,12 @@ Available Nmap tools:
 Discovery Tools:
 1. nmap_ping_sweep(target_network, timeout) - Discover live hosts
 2. nmap_tcp_scan(target, ports, scan_type) - TCP port scanning
-3. nmap_udp_scan(target, ports) - UDP port scanning
+3. nmap_udp_scan(target, ports) - UDP port scanning (requires sudo)
 
 Service Detection Tools:
 4. nmap_service_scan(target, ports) - Service version detection
-5. nmap_os_detection(target) - Operating system detection
-6. nmap_aggressive_scan(target, ports) - Comprehensive scan
+5. nmap_os_detection(target) - Operating system detection (requires sudo)
+6. nmap_aggressive_scan(target, ports) - Comprehensive scan (requires sudo)
 
 Script Scanning Tools:
 7. nmap_vuln_scan(target, ports) - Vulnerability detection
@@ -465,12 +504,12 @@ Script Scanning Tools:
 9. nmap_default_scripts(target, ports) - Safe default scripts
 
 Stealth and Evasion Tools:
-10. nmap_stealth_scan(target, ports) - Avoid detection
-11. nmap_timing_scan(target, timing, ports) - Control scan speed
-12. nmap_top_ports(target, top_ports) - Scan common ports
+10. nmap_stealth_scan(target, ports) - Avoid detection (requires sudo)
+11. nmap_timing_scan(target, timing, ports) - Control scan speed (requires sudo)
+12. nmap_top_ports(target, top_ports) - Scan common ports (requires sudo)
 
 Custom Tool:
-13. nmap_custom_scan(target, options) - Custom Nmap command
+13. nmap_custom_scan(target, options) - Custom Nmap command (auto-detects sudo need)
 
 Common port specifications:
 - "22,80,443" - Specific ports
@@ -513,4 +552,24 @@ if __name__ == "__main__":
     
     print(" Nmap MCP Server running...", file=sys.stderr)
     print("Remember: Only scan systems you own or have permission to test!", file=sys.stderr)
+    
+    # Check sudo configuration for privileged scans
+    if os.geteuid() != 0:
+        try:
+            sudo_check = subprocess.run(
+                ["sudo", "-n", "nmap", "--version"], 
+                capture_output=True, 
+                timeout=5
+            )
+            if sudo_check.returncode == 0:
+                print("✓ Sudo access configured for privileged scans", file=sys.stderr)
+            else:
+                print(" Sudo access not configured. Some scans may fail.", file=sys.stderr)
+                print(" Configure with: sudo visudo", file=sys.stderr)
+                print(" Add line: your_username ALL=(ALL) NOPASSWD: /usr/bin/nmap", file=sys.stderr)
+        except:
+            print("Cannot verify sudo access", file=sys.stderr)
+    else:
+        print(" Running as root - all scan types available", file=sys.stderr)
+    
     mcp.run(transport="stdio")
